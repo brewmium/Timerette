@@ -1,6 +1,7 @@
 import Cocoa
 import Carbon.HIToolbox
 import ServiceManagement
+import UserNotifications
 
 // MARK: - Carbon hotkey callback (free function for C interop)
 
@@ -15,7 +16,7 @@ private func hotKeyCallback(
 
 // MARK: - AppDelegate
 
-class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotificationCenterDelegate {
 	static weak var instance: AppDelegate?
 
 	private var statusItem: NSStatusItem!
@@ -25,6 +26,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 	private var hotKeyRef: EventHotKeyRef?
 	private var eventHandlerRef: EventHandlerRef?
 	private var runningMenuItems: [UUID: NSMenuItem] = [:]
+	private var ringingSounds: [UUID: NSSound] = [:]
+	private var chips: [UUID: AlertChip] = [:]
+	private var notificationsAuthorized = false
+
+	private static let alertSounds = [
+		"Basso", "Blow", "Bottle", "Frog", "Funk", "Glass", "Hero",
+		"Morse", "Ping", "Pop", "Purr", "Sosumi", "Submarine", "Tink",
+	]
+	private static let defaultAlertSound = "Glass"
 
 	// MARK: Lifecycle
 
@@ -43,10 +53,104 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 		timerStore.onChange = { [weak self] in
 			self?.renderStatusItem()
 		}
+		timerStore.onFire = { [weak self] timer in
+			self?.timerFired(timer)
+		}
+		timerStore.onRingEnd = { [weak self] timer in
+			self?.ringEnded(timer)
+		}
 		presetStore.onChange = { [weak self] in
 			self?.entryPanel.refreshVisibleRows()
 		}
+		setupNotifications()
 		renderStatusItem()
+	}
+
+	// MARK: Alerts on fire
+
+	private var selectedAlertSound: String {
+		UserDefaults.standard.string(forKey: "alertSound") ?? Self.defaultAlertSound
+	}
+
+	private func timerFired(_ timer: CountdownTimer) {
+		// 10s chime loop (TimerStore ends the ring; any Stop cuts it early)
+		if let sound = NSSound(named: selectedAlertSound) {
+			sound.loops = true
+			sound.play()
+			ringingSounds[timer.id] = sound
+		}
+
+		postNotification(for: timer)
+
+		// Guaranteed-visible rule: if you can't hear it, you can see it
+		if AudioState.outputIsEffectivelySilent() || !notificationsAuthorized {
+			showChip(for: timer)
+		}
+	}
+
+	private func ringEnded(_ timer: CountdownTimer) {
+		ringingSounds[timer.id]?.stop()
+		ringingSounds[timer.id] = nil
+		chips[timer.id]?.close()
+		chips[timer.id] = nil
+		UNUserNotificationCenter.current()
+			.removeDeliveredNotifications(withIdentifiers: [timer.id.uuidString])
+	}
+
+	private func showChip(for timer: CountdownTimer) {
+		let chip = AlertChip(timer: timer, index: chips.count)
+		chip.onStop = { [weak self] id in
+			self?.timerStore.stopRinging(id: id)
+		}
+		chips[timer.id] = chip
+		chip.show()
+	}
+
+	// MARK: Notifications
+
+	private func setupNotifications() {
+		let center = UNUserNotificationCenter.current()
+		center.delegate = self
+		let stop = UNNotificationAction(identifier: "STOP", title: "Stop", options: [])
+		let category = UNNotificationCategory(
+			identifier: "TIMER_DONE", actions: [stop], intentIdentifiers: [], options: [])
+		center.setNotificationCategories([category])
+		center.requestAuthorization(options: [.alert]) { [weak self] granted, _ in
+			DispatchQueue.main.async { self?.notificationsAuthorized = granted }
+		}
+	}
+
+	private func postNotification(for timer: CountdownTimer) {
+		guard notificationsAuthorized else { return }
+		let content = UNMutableNotificationContent()
+		content.title = timer.displayName
+		content.body = "Time's up"
+		content.categoryIdentifier = "TIMER_DONE"
+		let request = UNNotificationRequest(
+			identifier: timer.id.uuidString, content: content, trigger: nil)
+		UNUserNotificationCenter.current().add(request)
+	}
+
+	// Show banners while the app is "frontmost" (accessory apps usually are not,
+	// but a ringing timer must surface either way)
+	func userNotificationCenter(_ center: UNUserNotificationCenter,
+		willPresent notification: UNNotification,
+		withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void)
+	{
+		completionHandler([.banner])
+	}
+
+	// Stop action -- or any click on the notification -- stops the ringing
+	func userNotificationCenter(_ center: UNUserNotificationCenter,
+		didReceive response: UNNotificationResponse,
+		withCompletionHandler completionHandler: @escaping () -> Void)
+	{
+		if let id = UUID(uuidString: response.notification.request.identifier) {
+			DispatchQueue.main.async { [weak self] in
+				self?.timerStore.stopRinging(id: id)
+			}
+		}
+		completionHandler()
 	}
 
 	// MARK: Menu bar
@@ -118,6 +222,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 		let hotKeyItem = NSMenuItem(title: "Change Hotkey (\(keyStr))...", action: #selector(changeHotKey), keyEquivalent: "")
 		hotKeyItem.target = self
 		settingsMenu.addItem(hotKeyItem)
+
+		let soundMenu = NSMenu()
+		for name in Self.alertSounds {
+			let item = NSMenuItem(title: name, action: #selector(changeAlertSound(_:)), keyEquivalent: "")
+			item.target = self
+			item.state = name == selectedAlertSound ? .on : .off
+			soundMenu.addItem(item)
+		}
+		let soundItem = NSMenuItem(title: "Alert Sound", action: nil, keyEquivalent: "")
+		soundItem.submenu = soundMenu
+		settingsMenu.addItem(soundItem)
 
 		let loginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
 		loginItem.target = self
@@ -206,6 +321,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 	@objc private func stopTimerRinging(_ sender: NSMenuItem) {
 		guard let id = sender.representedObject as? UUID else { return }
 		timerStore.stopRinging(id: id)
+	}
+
+	@objc private func changeAlertSound(_ sender: NSMenuItem) {
+		UserDefaults.standard.set(sender.title, forKey: "alertSound")
+		NSSound(named: sender.title)?.play()
 	}
 
 	@objc private func toggleLaunchAtLogin() {
