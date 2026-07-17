@@ -81,6 +81,6 @@ class PresetStore {
 		let encoder = JSONEncoder()
 		encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
 		guard let data = try? encoder.encode(presets) else { return }
-		try? data.write(to: fileURL)
+		try? data.write(to: fileURL, options: [.atomic])
 	}
 }

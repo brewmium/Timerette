@@ -179,7 +179,7 @@ class TimerStore {
 		encoder.dateEncodingStrategy = .iso8601
 		encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
 		guard let data = try? encoder.encode(timers) else { return }
-		try? data.write(to: fileURL)
+		try? data.write(to: fileURL, options: [.atomic])
 	}
 
 	private func restore() {

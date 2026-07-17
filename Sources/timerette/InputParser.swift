@@ -9,13 +9,14 @@ enum TimerInput: Equatable {
 
 extension TimerInput {
 	// Live preview row text in the entry panel
-	func previewTitle(now: Date = Date()) -> String {
+	func previewTitle(label: String? = nil, now: Date = Date()) -> String {
+		let suffix = label.map { " \"\($0)\"" } ?? ""
 		switch self {
 		case .duration(let span):
-			return "Start a \(TimeFormat.compact(span)) timer"
+			return "Start a \(TimeFormat.compact(span)) timer\(suffix)"
 		case .clockTime(let date):
 			let remaining = date.timeIntervalSince(now)
-			return "Alarm at \(TimeFormat.clockString(date))  (in \(TimeFormat.compact(remaining)))"
+			return "Alarm at \(TimeFormat.clockString(date))\(suffix)  (in \(TimeFormat.compact(remaining)))"
 		}
 	}
 }
@@ -37,6 +38,29 @@ enum InputParser {
 		}
 		guard let span = parseDuration(s) else { return nil }
 		return .duration(span)
+	}
+
+	// Inline labels: "2.5 tea" -> a 2m 30s timer labeled "tea". The longest
+	// parseable prefix wins; the remainder is the label and must not begin
+	// with a digit (so "15 45" stays rejected).
+	static func parseWithLabel(_ raw: String, now: Date = Date(), calendar: Calendar = .current)
+		-> (input: TimerInput, label: String?)?
+	{
+		if let input = parse(raw, now: now, calendar: calendar) {
+			return (input, nil)
+		}
+		let words = raw.trimmingCharacters(in: .whitespaces)
+			.split(whereSeparator: { $0.isWhitespace })
+		guard words.count >= 2 else { return nil }
+		for split in stride(from: words.count - 1, through: 1, by: -1) {
+			let tail = words[split...].joined(separator: " ")
+			guard let first = tail.first, !first.isNumber else { continue }
+			let head = words[0..<split].joined(separator: " ")
+			if let input = parse(head, now: now, calendar: calendar) {
+				return (input, tail)
+			}
+		}
+		return nil
 	}
 
 	// MARK: Clock track

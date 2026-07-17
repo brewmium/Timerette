@@ -137,6 +137,38 @@ final class InputParserTests: XCTestCase {
 		XCTAssertNil(InputParser.parse("pm", now: now, calendar: calendar))
 	}
 
+	// MARK: Inline labels
+
+	func testInlineLabels() {
+		let tea = InputParser.parseWithLabel("2.5 tea", now: now, calendar: calendar)
+		XCTAssertEqual(tea?.input, .duration(150))
+		XCTAssertEqual(tea?.label, "tea")
+
+		let pasta = InputParser.parseWithLabel("2h 30m pasta sauce", now: now, calendar: calendar)
+		XCTAssertEqual(pasta?.input, .duration(9000))
+		XCTAssertEqual(pasta?.label, "pasta sauce")
+
+		let standup = InputParser.parseWithLabel("3:30pm standup", now: now, calendar: calendar)
+		XCTAssertEqual(standup?.label, "standup")
+		if case .clockTime(let date)? = standup?.input {
+			XCTAssertEqual(hourMinute(date).0, 15)
+			XCTAssertEqual(hourMinute(date).1, 30)
+		} else {
+			XCTFail("3:30pm standup should be a clock time")
+		}
+
+		let plain = InputParser.parseWithLabel("2.5", now: now, calendar: calendar)
+		XCTAssertEqual(plain?.input, .duration(150))
+		XCTAssertNil(plain?.label)
+	}
+
+	func testInlineLabelRejections() {
+		// Two bare numbers stay rejected -- "45" is not a label
+		XCTAssertNil(InputParser.parseWithLabel("15 45", now: now, calendar: calendar))
+		XCTAssertNil(InputParser.parseWithLabel("tea", now: now, calendar: calendar))
+		XCTAssertNil(InputParser.parseWithLabel("tea time", now: now, calendar: calendar))
+	}
+
 	// MARK: Preview titles
 
 	func testPreviewTitles() {

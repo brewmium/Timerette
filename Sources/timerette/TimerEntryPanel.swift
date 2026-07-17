@@ -291,12 +291,12 @@ class TimerEntryPanel: NSPanel, NSTextFieldDelegate, NSTableViewDataSource, NSTa
 					action: { [weak self] in self?.onStart?(.duration(preset.total), preset.label) }
 				))
 			}
-		} else if let input = InputParser.parse(query) {
+		} else if let (input, label) = InputParser.parseWithLabel(query) {
 			rows.append(EntryRow(
-				title: input.previewTitle(),
+				title: input.previewTitle(label: label),
 				detail: "Return",
 				muted: false,
-				action: { [weak self] in self?.onStart?(input, nil) }
+				action: { [weak self] in self?.onStart?(input, label) }
 			))
 		} else {
 			rows.append(EntryRow(
