@@ -15,7 +15,7 @@ private func hotKeyCallback(
 
 // MARK: - AppDelegate
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 	static weak var instance: AppDelegate?
 
 	private var statusItem: NSStatusItem!
@@ -23,7 +23,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 	private let timerStore = TimerStore()
 	private var hotKeyRef: EventHotKeyRef?
 	private var eventHandlerRef: EventHandlerRef?
-	private var hotKeyMenuItem: NSMenuItem!
+	private var runningMenuItems: [UUID: NSMenuItem] = [:]
 
 	// MARK: Lifecycle
 
@@ -46,30 +46,157 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
 	private func renderStatusItem() {
 		MenuBarView.render(statusItem: statusItem, store: timerStore)
+
+		// Live-update running rows while the menu is open
+		for (id, item) in runningMenuItems {
+			if let timer = timerStore.timer(id: id) {
+				item.title = runningTitle(timer)
+			}
+		}
 	}
 
 	private func setupMenuBar() {
 		statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-
 		let menu = NSMenu()
+		menu.delegate = self
+		statusItem.menu = menu
+	}
 
+	// MARK: Menu building (rebuilt on every open)
+
+	func menuNeedsUpdate(_ menu: NSMenu) {
+		menu.removeAllItems()
+		runningMenuItems = [:]
+
+		// Running section
+		if timerStore.count == 0 {
+			menu.addItem(NSMenuItem(title: "No timers running", action: nil, keyEquivalent: ""))
+		} else {
+			for timer in timerStore.timers {
+				let item = NSMenuItem(title: runningTitle(timer), action: nil, keyEquivalent: "")
+				item.submenu = timerSubmenu(timer)
+				menu.addItem(item)
+				runningMenuItems[timer.id] = item
+			}
+		}
+		menu.addItem(.separator())
+
+		// Presets section
 		let newTimerItem = NSMenuItem(title: "New Timer...", action: #selector(newTimer), keyEquivalent: "")
 		newTimerItem.target = self
+		applyHotkeyHint(to: newTimerItem)
 		menu.addItem(newTimerItem)
+		// Preset rows + Edit Presets... arrive in Phase 5
+		menu.addItem(.separator())
+
+		// Settings + quit
+		let settingsMenu = NSMenu()
 
 		let pref = loadHotKeyPreference()
 		let keyStr = hotkeyDisplayString(keyCode: pref.keyCode, modifiers: pref.modifiers)
-		hotKeyMenuItem = NSMenuItem(title: "Change Hotkey (\(keyStr))...", action: #selector(changeHotKey), keyEquivalent: "")
-		hotKeyMenuItem.target = self
-		menu.addItem(hotKeyMenuItem)
+		let hotKeyItem = NSMenuItem(title: "Change Hotkey (\(keyStr))...", action: #selector(changeHotKey), keyEquivalent: "")
+		hotKeyItem.target = self
+		settingsMenu.addItem(hotKeyItem)
 
-		menu.addItem(NSMenuItem.separator())
+		let loginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
+		loginItem.target = self
+		loginItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
+		settingsMenu.addItem(loginItem)
+
+		let settingsItem = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
+		settingsItem.submenu = settingsMenu
+		menu.addItem(settingsItem)
 
 		let quitItem = NSMenuItem(title: "Quit Timerette", action: #selector(quit), keyEquivalent: "")
 		quitItem.target = self
 		menu.addItem(quitItem)
+	}
 
-		statusItem.menu = menu
+	private func runningTitle(_ timer: CountdownTimer) -> String {
+		switch timer.state {
+		case .ringing: return "\(timer.displayName) -- Time's up"
+		case .paused: return "\(timer.displayName) -- \(TimeFormat.compact(timer.remaining)) (paused)"
+		case .running: return "\(timer.displayName) -- \(TimeFormat.compact(timer.remaining))"
+		}
+	}
+
+	private func timerSubmenu(_ timer: CountdownTimer) -> NSMenu {
+		let sub = NSMenu()
+
+		func add(_ title: String, _ action: Selector) {
+			let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+			item.target = self
+			item.representedObject = timer.id
+			sub.addItem(item)
+		}
+
+		switch timer.state {
+		case .ringing:
+			add("Stop", #selector(stopTimerRinging(_:)))
+		case .paused:
+			add("Resume", #selector(resumeTimer(_:)))
+			add("+1m", #selector(addMinuteToTimer(_:)))
+			add("Cancel", #selector(cancelTimer(_:)))
+		case .running:
+			add("Pause", #selector(pauseTimer(_:)))
+			add("+1m", #selector(addMinuteToTimer(_:)))
+			add("Cancel", #selector(cancelTimer(_:)))
+		}
+		return sub
+	}
+
+	// Show the global hotkey as the New Timer... shortcut hint when it maps
+	// to a plain menu key equivalent
+	private func applyHotkeyHint(to item: NSMenuItem) {
+		let pref = loadHotKeyPreference()
+		let name = Self.keyName(pref.keyCode)
+		guard name.count == 1 else { return }
+		item.keyEquivalent = name.lowercased()
+		var mask: NSEvent.ModifierFlags = []
+		if pref.modifiers & UInt32(cmdKey) != 0 { mask.insert(.command) }
+		if pref.modifiers & UInt32(optionKey) != 0 { mask.insert(.option) }
+		if pref.modifiers & UInt32(controlKey) != 0 { mask.insert(.control) }
+		if pref.modifiers & UInt32(shiftKey) != 0 { mask.insert(.shift) }
+		item.keyEquivalentModifierMask = mask
+	}
+
+	// MARK: Timer menu actions
+
+	@objc private func pauseTimer(_ sender: NSMenuItem) {
+		guard let id = sender.representedObject as? UUID else { return }
+		timerStore.pause(id: id)
+	}
+
+	@objc private func resumeTimer(_ sender: NSMenuItem) {
+		guard let id = sender.representedObject as? UUID else { return }
+		timerStore.resume(id: id)
+	}
+
+	@objc private func addMinuteToTimer(_ sender: NSMenuItem) {
+		guard let id = sender.representedObject as? UUID else { return }
+		timerStore.addMinute(id: id)
+	}
+
+	@objc private func cancelTimer(_ sender: NSMenuItem) {
+		guard let id = sender.representedObject as? UUID else { return }
+		timerStore.cancel(id: id)
+	}
+
+	@objc private func stopTimerRinging(_ sender: NSMenuItem) {
+		guard let id = sender.representedObject as? UUID else { return }
+		timerStore.stopRinging(id: id)
+	}
+
+	@objc private func toggleLaunchAtLogin() {
+		do {
+			if SMAppService.mainApp.status == .enabled {
+				try SMAppService.mainApp.unregister()
+			} else {
+				try SMAppService.mainApp.register()
+			}
+		} catch {
+			NSLog("Timerette: Failed to toggle login item: \(error)")
+		}
 	}
 
 	// MARK: Global hotkey
@@ -139,9 +266,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 		let hotKeyID = EventHotKeyID(signature: OSType(0x544D5254), id: 1)
 		RegisterEventHotKey(keyCode, modifiers, hotKeyID, GetEventDispatcherTarget(), 0, &hotKeyRef)
 		saveHotKeyPreference(keyCode: keyCode, modifiers: modifiers)
-
-		let keyStr = hotkeyDisplayString(keyCode: keyCode, modifiers: modifiers)
-		hotKeyMenuItem.title = "Change Hotkey (\(keyStr))..."
+		// Menu titles pick up the new binding on the next menuNeedsUpdate
 	}
 
 	// MARK: Hotkey display
