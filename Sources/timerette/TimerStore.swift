@@ -13,6 +13,20 @@ class TimerStore {
 	static let ringDuration: TimeInterval = 10
 	private var ringDeadlines: [UUID: Date] = [:]
 	private var tickTimer: Timer?
+	private let fileURL: URL
+
+	init(directory: URL? = nil) {
+		let dir: URL
+		if let directory {
+			dir = directory
+		} else {
+			let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+			dir = appSupport.appendingPathComponent("Timerette")
+		}
+		try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+		fileURL = dir.appendingPathComponent("timers.json")
+		restore()
+	}
 
 	// MARK: Start / control
 
@@ -142,11 +156,51 @@ class TimerStore {
 
 		for t in fired { onFire?(t) }
 		for t in ended { onRingEnd?(t) }
-		changed()
+		if !fired.isEmpty || !ended.isEmpty {
+			save()
+		}
+		ensureTicking()
+		onChange?()
 	}
 
 	private func changed() {
 		ensureTicking()
+		save()
 		onChange?()
+	}
+
+	// MARK: Persistence
+
+	// Written on every change so a 3-day auction timer outlives a quit or a
+	// reboot. Remaining time is derived from fireDate, so restore is just
+	// "is the fireDate still ahead".
+	private func save() {
+		let encoder = JSONEncoder()
+		encoder.dateEncodingStrategy = .iso8601
+		encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+		guard let data = try? encoder.encode(timers) else { return }
+		try? data.write(to: fileURL)
+	}
+
+	private func restore() {
+		guard let data = try? Data(contentsOf: fileURL) else { return }
+		let decoder = JSONDecoder()
+		decoder.dateDecodingStrategy = .iso8601
+		guard let saved = try? decoder.decode([CountdownTimer].self, from: data) else { return }
+
+		let now = Date()
+		timers = saved.compactMap { saved in
+			var timer = saved
+			switch timer.state {
+			case .paused:
+				return timer
+			case .running, .ringing:
+				// Re-arm if the fireDate is still ahead; drop anything that
+				// expired while the app was not running -- no retroactive chime
+				timer.state = .running
+				return timer.fireDate > now ? timer : nil
+			}
+		}
+		changed()
 	}
 }

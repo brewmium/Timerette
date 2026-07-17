@@ -2,8 +2,24 @@ import XCTest
 @testable import timerette
 
 final class TimerStoreTests: XCTestCase {
+	private var dir: URL!
+
+	override func setUp() {
+		dir = FileManager.default.temporaryDirectory
+			.appendingPathComponent("timerette-tests-\(UUID().uuidString)")
+		try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+	}
+
+	override func tearDown() {
+		try? FileManager.default.removeItem(at: dir)
+	}
+
+	private func makeStore() -> TimerStore {
+		TimerStore(directory: dir)
+	}
+
 	func testStartDurationSetsFireDate() {
-		let store = TimerStore()
+		let store = makeStore()
 		store.start(.duration(150))
 		XCTAssertEqual(store.count, 1)
 		let t = store.timers[0]
@@ -14,7 +30,7 @@ final class TimerStoreTests: XCTestCase {
 	}
 
 	func testStartClockAlarmKeepsResolvedDate() {
-		let store = TimerStore()
+		let store = makeStore()
 		let target = Date().addingTimeInterval(6423)
 		store.start(.clockTime(target))
 		let t = store.timers[0]
@@ -23,7 +39,7 @@ final class TimerStoreTests: XCTestCase {
 	}
 
 	func testSoonestTracksNearestFireDateSkippingPaused() {
-		let store = TimerStore()
+		let store = makeStore()
 		store.start(.duration(300))
 		store.start(.duration(100))
 		store.start(.duration(200))
@@ -34,7 +50,7 @@ final class TimerStoreTests: XCTestCase {
 	}
 
 	func testPauseResumePreservesRemaining() {
-		let store = TimerStore()
+		let store = makeStore()
 		store.start(.duration(300))
 		let id = store.timers[0].id
 
@@ -48,7 +64,7 @@ final class TimerStoreTests: XCTestCase {
 	}
 
 	func testAddMinute() {
-		let store = TimerStore()
+		let store = makeStore()
 		store.start(.duration(60))
 		let id = store.timers[0].id
 		store.addMinute(id: id)
@@ -56,7 +72,7 @@ final class TimerStoreTests: XCTestCase {
 	}
 
 	func testFireTransitionsToRingingThenRemovesAfterTenSeconds() {
-		let store = TimerStore()
+		let store = makeStore()
 		var firedNames: [String] = []
 		var endedNames: [String] = []
 		store.onFire = { firedNames.append($0.displayName) }
@@ -76,7 +92,7 @@ final class TimerStoreTests: XCTestCase {
 	}
 
 	func testStopRingingRemovesEarly() {
-		let store = TimerStore()
+		let store = makeStore()
 		var rangEnded = false
 		store.onRingEnd = { _ in rangEnded = true }
 
@@ -91,7 +107,7 @@ final class TimerStoreTests: XCTestCase {
 	}
 
 	func testCancelRemoves() {
-		let store = TimerStore()
+		let store = makeStore()
 		store.start(.duration(100))
 		store.cancel(id: store.timers[0].id)
 		XCTAssertEqual(store.count, 0)
