@@ -81,6 +81,8 @@ class TimerEntryPanel: NSPanel, NSTextFieldDelegate, NSTableViewDataSource, NSTa
 	private var rows: [EntryRow] = []
 	private var previousApp: NSRunningApplication?
 
+	var onStart: ((TimerInput) -> Void)?
+
 	private let panelWidth: CGFloat = 561
 	private let fieldHeight: CGFloat = 48
 	private let rowHeight: CGFloat = 40
@@ -270,7 +272,27 @@ class TimerEntryPanel: NSPanel, NSTextFieldDelegate, NSTableViewDataSource, NSTa
 	// MARK: Rows
 
 	private func refreshRows() {
+		let query = inputField.stringValue.trimmingCharacters(in: .whitespaces)
 		rows = []
+
+		if query.isEmpty {
+			// Preset rows arrive in Phase 5
+		} else if let input = InputParser.parse(query) {
+			rows.append(EntryRow(
+				title: input.previewTitle(),
+				detail: "Return",
+				muted: false,
+				action: { [weak self] in self?.onStart?(input) }
+			))
+		} else {
+			rows.append(EntryRow(
+				title: "Keep typing -- 2.5, 90s, 1h30m, 3:30pm...",
+				detail: "",
+				muted: true,
+				action: nil
+			))
+		}
+
 		rowsTable.reloadData()
 		selectFirstSelectable()
 		updatePanelSize()

@@ -32,6 +32,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 		installEventHandler()
 		registerHotKey()
 		entryPanel = TimerEntryPanel()
+		entryPanel.onStart = { input in
+			// Phase 3 wires this into TimerStore; for now log the resolved fireDate
+			let fireDate: Date
+			switch input {
+			case .duration(let span): fireDate = Date().addingTimeInterval(span)
+			case .clockTime(let date): fireDate = date
+			}
+			NSLog("Timerette: would fire at \(fireDate)")
+		}
 	}
 
 	// MARK: Menu bar
