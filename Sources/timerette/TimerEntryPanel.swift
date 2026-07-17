@@ -81,7 +81,8 @@ class TimerEntryPanel: NSPanel, NSTextFieldDelegate, NSTableViewDataSource, NSTa
 	private var rows: [EntryRow] = []
 	private var previousApp: NSRunningApplication?
 
-	var onStart: ((TimerInput) -> Void)?
+	var onStart: ((TimerInput, String?) -> Void)?
+	var presetsProvider: (() -> [Preset])?
 
 	private let panelWidth: CGFloat = 561
 	private let fieldHeight: CGFloat = 48
@@ -271,18 +272,31 @@ class TimerEntryPanel: NSPanel, NSTextFieldDelegate, NSTableViewDataSource, NSTa
 
 	// MARK: Rows
 
+	func refreshVisibleRows() {
+		if isVisible {
+			refreshRows()
+		}
+	}
+
 	private func refreshRows() {
 		let query = inputField.stringValue.trimmingCharacters(in: .whitespaces)
 		rows = []
 
 		if query.isEmpty {
-			// Preset rows arrive in Phase 5
+			for preset in presetsProvider?() ?? [] {
+				rows.append(EntryRow(
+					title: preset.label,
+					detail: TimeFormat.compact(preset.total),
+					muted: false,
+					action: { [weak self] in self?.onStart?(.duration(preset.total), preset.label) }
+				))
+			}
 		} else if let input = InputParser.parse(query) {
 			rows.append(EntryRow(
 				title: input.previewTitle(),
 				detail: "Return",
 				muted: false,
-				action: { [weak self] in self?.onStart?(input) }
+				action: { [weak self] in self?.onStart?(input, nil) }
 			))
 		} else {
 			rows.append(EntryRow(

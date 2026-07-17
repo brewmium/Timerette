@@ -21,6 +21,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 	private var statusItem: NSStatusItem!
 	private var entryPanel: TimerEntryPanel!
 	private let timerStore = TimerStore()
+	private let presetStore = PresetStore()
 	private var hotKeyRef: EventHotKeyRef?
 	private var eventHandlerRef: EventHandlerRef?
 	private var runningMenuItems: [UUID: NSMenuItem] = [:]
@@ -33,11 +34,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 		installEventHandler()
 		registerHotKey()
 		entryPanel = TimerEntryPanel()
-		entryPanel.onStart = { [weak self] input in
-			self?.timerStore.start(input)
+		entryPanel.onStart = { [weak self] input, label in
+			self?.timerStore.start(input, label: label)
+		}
+		entryPanel.presetsProvider = { [weak self] in
+			self?.presetStore.presets ?? []
 		}
 		timerStore.onChange = { [weak self] in
 			self?.renderStatusItem()
+		}
+		presetStore.onChange = { [weak self] in
+			self?.entryPanel.refreshVisibleRows()
 		}
 		renderStatusItem()
 	}
@@ -86,7 +93,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 		newTimerItem.target = self
 		applyHotkeyHint(to: newTimerItem)
 		menu.addItem(newTimerItem)
-		// Preset rows + Edit Presets... arrive in Phase 5
+
+		for preset in presetStore.presets {
+			let item = NSMenuItem(
+				title: "Start \"\(preset.label)\" (\(TimeFormat.compact(preset.total)))",
+				action: #selector(startPreset(_:)), keyEquivalent: ""
+			)
+			item.target = self
+			item.representedObject = preset.id
+			menu.addItem(item)
+		}
+
+		let editItem = NSMenuItem(title: "Edit Presets...", action: #selector(showManagePresets), keyEquivalent: "")
+		editItem.target = self
+		menu.addItem(editItem)
+
 		menu.addItem(.separator())
 
 		// Settings + quit
@@ -331,6 +352,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
 	@objc private func newTimer() {
 		entryPanel.showPanel()
+	}
+
+	// Starts immediately, without the panel
+	@objc private func startPreset(_ sender: NSMenuItem) {
+		guard let id = sender.representedObject as? UUID,
+			let preset = presetStore.presets.first(where: { $0.id == id })
+		else { return }
+		timerStore.start(.duration(preset.total), label: preset.label)
+	}
+
+	@objc private func showManagePresets() {
+		let panel = ManagePresetsPanel(presetStore: presetStore)
+		NSApp.activate(ignoringOtherApps: true)
+		panel.makeKeyAndOrderFront(nil)
 	}
 
 	@objc private func quit() {
