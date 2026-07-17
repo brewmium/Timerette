@@ -20,6 +20,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
 	private var statusItem: NSStatusItem!
 	private var entryPanel: TimerEntryPanel!
+	private let timerStore = TimerStore()
 	private var hotKeyRef: EventHotKeyRef?
 	private var eventHandlerRef: EventHandlerRef?
 	private var hotKeyMenuItem: NSMenuItem!
@@ -32,28 +33,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 		installEventHandler()
 		registerHotKey()
 		entryPanel = TimerEntryPanel()
-		entryPanel.onStart = { input in
-			// Phase 3 wires this into TimerStore; for now log the resolved fireDate
-			let fireDate: Date
-			switch input {
-			case .duration(let span): fireDate = Date().addingTimeInterval(span)
-			case .clockTime(let date): fireDate = date
-			}
-			NSLog("Timerette: would fire at \(fireDate)")
+		entryPanel.onStart = { [weak self] input in
+			self?.timerStore.start(input)
 		}
+		timerStore.onChange = { [weak self] in
+			self?.renderStatusItem()
+		}
+		renderStatusItem()
 	}
 
 	// MARK: Menu bar
 
+	private func renderStatusItem() {
+		MenuBarView.render(statusItem: statusItem, store: timerStore)
+	}
+
 	private func setupMenuBar() {
 		statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-		if let button = statusItem.button {
-			let config = NSImage.SymbolConfiguration(pointSize: 15, weight: .medium)
-			let icon = NSImage(systemSymbolName: "stopwatch", accessibilityDescription: "Timerette")!
-				.withSymbolConfiguration(config)!
-			icon.isTemplate = true
-			button.image = icon
-		}
 
 		let menu = NSMenu()
 
