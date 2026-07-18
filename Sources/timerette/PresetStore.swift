@@ -4,9 +4,18 @@ import Foundation
 
 struct Preset: Codable, Identifiable {
 	let id: UUID
-	var label: String
+	var label: String?
 	var total: TimeInterval
 	var sortOrder: Int
+
+	var hasLabel: Bool {
+		!(label ?? "").isEmpty
+	}
+
+	// Unlabeled presets go by their duration, same voice as CountdownTimer
+	var displayName: String {
+		hasLabel ? label! : "\(TimeFormat.compact(total)) timer"
+	}
 }
 
 // MARK: - Preset store
@@ -34,16 +43,19 @@ class PresetStore {
 
 	// MARK: CRUD
 
-	func add(label: String, total: TimeInterval) {
+	@discardableResult
+	func add(label: String? = nil, total: TimeInterval) -> Preset {
 		let order = (presets.map { $0.sortOrder }.max() ?? -1) + 1
-		presets.append(Preset(id: UUID(), label: label, total: total, sortOrder: order))
+		let preset = Preset(id: UUID(), label: normalized(label), total: total, sortOrder: order)
+		presets.append(preset)
 		save()
 		onChange?()
+		return preset
 	}
 
-	func update(id: UUID, label: String, total: TimeInterval) {
+	func update(id: UUID, label: String?, total: TimeInterval) {
 		guard let i = presets.firstIndex(where: { $0.id == id }) else { return }
-		presets[i].label = label
+		presets[i].label = normalized(label)
 		presets[i].total = total
 		save()
 		onChange?()
@@ -53,6 +65,24 @@ class PresetStore {
 		presets.removeAll { $0.id == id }
 		save()
 		onChange?()
+	}
+
+	// Reorder: `to` is the insertion index as shown before the row is lifted
+	// (NSTableView drop semantics)
+	func move(from: Int, to: Int) {
+		guard from >= 0, from < presets.count, to >= 0, to <= presets.count, from != to else { return }
+		let preset = presets.remove(at: from)
+		presets.insert(preset, at: to > from ? to - 1 : to)
+		for i in presets.indices {
+			presets[i].sortOrder = i
+		}
+		save()
+		onChange?()
+	}
+
+	private func normalized(_ label: String?) -> String? {
+		let trimmed = (label ?? "").trimmingCharacters(in: .whitespaces)
+		return trimmed.isEmpty ? nil : trimmed
 	}
 
 	// MARK: Persistence
@@ -68,12 +98,10 @@ class PresetStore {
 	}
 
 	private func seedDefaults() {
-		presets = [
-			Preset(id: UUID(), label: "Tea", total: 3 * 60, sortOrder: 0),
-			Preset(id: UUID(), label: "Coffee", total: 4 * 60, sortOrder: 1),
-			Preset(id: UUID(), label: "Pomodoro", total: 25 * 60, sortOrder: 2),
-			Preset(id: UUID(), label: "Break", total: 10 * 60, sortOrder: 3),
-		]
+		let totals: [TimeInterval] = [60, 180, 300, 600, 900, 1800, 3600]
+		presets = totals.enumerated().map { i, total in
+			Preset(id: UUID(), label: nil, total: total, sortOrder: i)
+		}
 		save()
 	}
 

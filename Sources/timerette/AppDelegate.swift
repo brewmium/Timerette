@@ -199,10 +199,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotifi
 		menu.addItem(newTimerItem)
 
 		for preset in presetStore.presets {
-			let item = NSMenuItem(
-				title: "Start \"\(preset.label)\" (\(TimeFormat.compact(preset.total)))",
-				action: #selector(startPreset(_:)), keyEquivalent: ""
-			)
+			let title = preset.hasLabel
+				? "Start \"\(preset.label!)\" (\(TimeFormat.compact(preset.total)))"
+				: "Start \(preset.displayName)"
+			let item = NSMenuItem(title: title, action: #selector(startPreset(_:)), keyEquivalent: "")
 			item.target = self
 			item.representedObject = preset.id
 			menu.addItem(item)

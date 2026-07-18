@@ -125,10 +125,10 @@ Layout:
 +----------------------------------------------------------+
 |  > Start a 2m 30s timer                          Return   |   live preview row (auto-selected while typing)
 |  ------------------------------------------------------  |
-|  Tea                                                3m    |   preset rows (shown when field is empty)
-|  Coffee                                             4m    |
-|  Pomodoro                                          25m    |
-|  Break                                             10m    |
+|  1m timer                                                 |   preset rows (shown when field is empty)
+|  3m timer                                                 |
+|  5m timer                                                 |
+|  Tea                                                3m    |   (a labeled one)
 +----------------------------------------------------------+
 ```
 
@@ -259,10 +259,10 @@ while open. Sections: **running / -- / presets / -- / settings + quit.**
   Alarm 3:00 PM -- 1h 47m 3s        >     submenu: Pause | +1m | Cancel
   ----------------------------------
   New Timer...                Ctrl-Opt-Cmd-T
-  Start "Tea" (3m)
-  Start "Coffee" (4m)
-  Start "Pomodoro" (25m)
-  Start "Break" (10m)
+  Start 1m timer
+  Start 3m timer
+  Start "Tea" (3m)                        <- a labeled preset
+  Start 1h timer
   Edit Presets...
   ----------------------------------
   Settings                          >     submenu: Change Hotkey... | Alert Sound > | Launch at Login
@@ -303,26 +303,25 @@ At zero a timer enters **ringing** for up to **10 seconds**, then clears itself:
 
 ### 3.8 Presets (CRUD)
 
-**`Preset`** (model): `id: UUID`, `label: String`, `total: TimeInterval`,
-`sortOrder: Int`. `Codable`. Presets are **durations only** (a one-click clock
-alarm has no fixed target without recurrence, which is out of scope).
+**`Preset`** (model): `id: UUID`, `label: String?`, `total: TimeInterval`,
+`sortOrder: Int`. `Codable`. The label is **optional** -- an unlabeled preset
+goes by its duration ("5m timer"), same voice as an unlabeled running timer.
+Presets are **durations only** (a one-click clock alarm has no fixed target
+without recurrence, which is out of scope).
 
 **`PresetStore`** (AppIndex's persistence role): loads/saves
 `~/Library/Application Support/Timerette/presets.json`. Seeds defaults on first
-run so the panel is never empty:
+run so the panel is never empty -- unlabeled, in order:
 
 ```
-  Tea       3m
-  Coffee    4m
-  Pomodoro 25m
-  Break    10m
+  1m   3m   5m   10m   15m   30m   1h
 ```
 
-**Management UI (`ManagePresetsPanel`):** modeled on `ManageAppsPanel` -- a
-titled panel with a table and Add / Edit / Remove. Add/Edit uses a label field +
-a duration field parsed by `InputParser` (duration track only; a clock-time entry
-is rejected there). Drag-to-reorder is a nice-to-have. Reached via
-`Edit Presets...`.
+**Management UI (`ManagePresetsPanel`):** a plain editable list -- click a
+cell and type; the edit commits when you leave the field (Return/Tab/click
+away), no separate save step. Durations parse via `InputParser` (duration
+track only; a clock-time entry is rejected there). Drag rows to reorder;
+`+` / `-` add and remove. Reached via `Edit Presets...`.
 
 Presets surface in the panel's row list and the menu's Presets section; both
 start a timer with one action.
@@ -518,12 +517,12 @@ monospaced menu-bar text; optional inline label parsing; finalize `README.md`
 
 ## 7. Open decisions (for Eric)
 
-Only two left; everything else is settled below.
+Only one left; everything else is settled below.
 
 1. **Count badge vs text** for multiple timers: drawn orange badge bubble
    (default) vs text suffix (`2m 30s x3`). Easy to swap after seeing it live.
-2. **Default preset set:** Tea 3m / Coffee 4m / Pomodoro 25m / Break 10m -- fine,
-   or swap for your go-tos.
+2. ~~**Default preset set**~~ -- decided: unlabeled 1m / 3m / 5m / 10m / 15m /
+   30m / 1h, in order.
 
 **Settled:** name = Timerette; accent = warm orange (~`#FF8A00`, tunable);
 parser = two tracks (bare number = minutes incl. `2.5`; units `d/h/m/s`;

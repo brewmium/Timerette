@@ -285,8 +285,8 @@ class TimerEntryPanel: NSPanel, NSTextFieldDelegate, NSTableViewDataSource, NSTa
 		if query.isEmpty {
 			for preset in presetsProvider?() ?? [] {
 				rows.append(EntryRow(
-					title: preset.label,
-					detail: TimeFormat.compact(preset.total),
+					title: preset.displayName,
+					detail: preset.hasLabel ? TimeFormat.compact(preset.total) : "",
 					muted: false,
 					action: { [weak self] in self?.onStart?(.duration(preset.total), preset.label) }
 				))

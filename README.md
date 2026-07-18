@@ -11,7 +11,7 @@ The Apple Clock app can run a timer, but starting one is a whole production -- l
 - **Multi-day timers** -- `3d22h` for that auction ending Thursday. No mental math, no calendar event.
 - **Survives quit and reboot** -- remaining time is anchored to the fire date, not a ticking counter. Anything that expired while the app was off is dropped silently, no retroactive alarm.
 - **Menu-bar countdown** -- the soonest timer counts down next to the icon in monospaced digits (`2m 30s`, `4d 3h 3m 1s`); an orange badge shows when 2+ run.
-- **Presets** -- Tea 3m, Coffee 4m, Pomodoro 25m, Break 10m out of the box; edit to taste. One click from the menu, or Return on an empty panel.
+- **Presets** -- 1m, 3m, 5m, 10m, 15m, 30m, and 1h out of the box. Label them or not, edit inline, drag to reorder. One click from the menu, or Return on an empty panel.
 - **Inline labels** -- `2.5 tea` starts a 2m 30s timer named "tea".
 - **Pause / +1m / Start Over / Cancel** per running timer, right in the menu.
 - **Never silent and invisible** -- on fire: a 10-second chime plus a notification with a Stop button. Audio muted or notifications denied? An orange always-on-top chip appears instead.
