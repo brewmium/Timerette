@@ -2,7 +2,7 @@
 
 The Apple Clock app can run a timer, but starting one is a whole production -- launch it, find the tab, spin a picker, hit start. Timerette is a global hotkey and a text field.
 
-**Ctrl-Opt-Cmd-C**, type `2.5`, **Return** -- a 2m 30s timer is counting down in your menu bar and the UI is already gone.
+**Ctrl-Opt-Cmd-T**, type `2.5`, **Return** -- a 2m 30s timer is counting down in your menu bar and the UI is already gone.
 
 ## Features
 
@@ -46,7 +46,7 @@ make run
 - **Ctrl-Opt-Cmd-T** (or your configured hotkey) to open the panel
 - Type a duration (`2.5`, `90s`, `1h30m`) or a clock time (`3:30pm`, `15:00`) -- the preview updates live -- **Return** starts it
 - **Return** on an empty field starts the first preset; **arrow keys** pick another; **Esc** dismisses
-- Click the menu bar icon to pause, +1m, start over, or cancel running timers, start presets one-click, edit presets, change the hotkey or alert sound
+- Click the menu bar icon to pause, +1m, start over, or cancel running timers, start presets one-click, or open Settings (presets, hotkey, alert sound, launch at login)
 - `swift test` covers the parser, the countdown format, and persistence
 
 ## Stack

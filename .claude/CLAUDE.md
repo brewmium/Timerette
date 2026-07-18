@@ -1,6 +1,6 @@
 # Timerette
 
-macOS menu-bar quick-timer. Global hotkey (default Ctrl-Opt-Cmd-C), type a
+macOS menu-bar quick-timer. Global hotkey (default Ctrl-Opt-Cmd-T), type a
 duration (`2.5`, `90s`, `3d22h`) or a clock time (`3:30pm`, `15:00`), Return --
 the countdown lives in the menu bar. Sibling app to Launchette: same stack,
 same patterns.

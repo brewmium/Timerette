@@ -259,13 +259,12 @@ while open. Sections: **running / -- / presets / -- / settings + quit.**
   Alarm 3:00 PM -- 1h 47m 3s        >     submenu: Pause | +1m | Cancel
   ----------------------------------
   New Timer...                Ctrl-Opt-Cmd-T
-  Start 1m timer
-  Start 3m timer
-  Start "Tea" (3m)                        <- a labeled preset
-  Start 1h timer
-  Edit Presets...
+  1m
+  3m
+  "Tea" (3m)                              <- a labeled preset
+  1h
   ----------------------------------
-  Settings                          >     submenu: Change Hotkey... | Alert Sound > | Launch at Login
+  Settings...
   Quit Timerette
 ```
 
@@ -276,10 +275,10 @@ while open. Sections: **running / -- / presets / -- / settings + quit.**
   Cancel. A **ringing** timer reads `... -- Time's up` with a **Stop**. If none
   running: a disabled "No timers running".
 - **Presets section:** `New Timer...` (opens the panel; shows the hotkey hint),
-  one `Start "<label>" (<dur>)` per preset that starts it **immediately without
-  the panel**, then `Edit Presets...`.
-- **Settings + quit:** a `Settings` submenu (Change Hotkey..., Alert Sound
-  picker, Launch at Login) and `Quit Timerette`.
+  then one row per preset that starts it **immediately without the panel** --
+  unlabeled reads just the duration (`5m`), labeled reads `"<label>" (<dur>)`.
+- **Settings + quit:** `Settings...` opens the settings window (3.8/3.9)
+  and `Quit Timerette`.
 
 ### 3.7 Alerts on fire
 
@@ -287,7 +286,7 @@ At zero a timer enters **ringing** for up to **10 seconds**, then clears itself:
 
 - **Chime (10s):** the selected alert sound loops via `NSSound` (`.loops = true`)
   and stops after 10s -- or earlier by any Stop (the chip, the menu's ringing
-  row, or the notification). Sound is picked from the Alert Sound submenu.
+  row, or the notification). Sound is picked in the settings window.
 - **Notification:** a local `UNUserNotificationCenter` notification always fires,
   carrying the label (or duration/target) and a Stop action. Authorization
   requested once on first launch.
@@ -317,18 +316,21 @@ run so the panel is never empty -- unlabeled, in order:
   1m   3m   5m   10m   15m   30m   1h
 ```
 
-**Management UI (`ManagePresetsPanel`):** a plain editable list -- click a
-cell and type; the edit commits when you leave the field (Return/Tab/click
-away), no separate save step. Durations parse via `InputParser` (duration
-track only; a clock-time entry is rejected there). Drag rows to reorder;
-`+` / `-` add and remove. Reached via `Edit Presets...`.
+**Management UI:** the Presets section of the settings window (`SettingsPanel`,
+3.9) -- a plain editable list: click a cell and type; the edit commits when you
+leave the field (Return/Tab/click away), no separate save step. Durations
+parse via `InputParser` (duration track only; a clock-time entry is rejected
+there). Drag rows to reorder; `+` / `-` add and remove.
 
 Presets surface in the panel's row list and the menu's Presets section; both
 start a timer with one action.
 
 ### 3.9 Settings & persistence summary
 
-All settings live in the menu (no preferences window), same as Launchette.
+One settings window (`SettingsPanel`, reached via the menu's `Settings...`):
+the editable preset list on top (3.8), then hotkey (current binding + a
+Change... button that opens the recorder), an Alert Sound popup (previews on
+pick), and a Launch at Login checkbox.
 
 | What                | Where stored                                    |
 |---------------------|-------------------------------------------------|

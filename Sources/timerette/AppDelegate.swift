@@ -200,47 +200,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotifi
 
 		for preset in presetStore.presets {
 			let title = preset.hasLabel
-				? "Start \"\(preset.label!)\" (\(TimeFormat.compact(preset.total)))"
-				: "Start \(preset.displayName)"
+				? "\"\(preset.label!)\" (\(TimeFormat.compact(preset.total)))"
+				: TimeFormat.compact(preset.total)
 			let item = NSMenuItem(title: title, action: #selector(startPreset(_:)), keyEquivalent: "")
 			item.target = self
 			item.representedObject = preset.id
 			menu.addItem(item)
 		}
 
-		let editItem = NSMenuItem(title: "Edit Presets...", action: #selector(showManagePresets), keyEquivalent: "")
-		editItem.target = self
-		menu.addItem(editItem)
-
 		menu.addItem(.separator())
 
 		// Settings + quit
-		let settingsMenu = NSMenu()
-
-		let pref = loadHotKeyPreference()
-		let keyStr = hotkeyDisplayString(keyCode: pref.keyCode, modifiers: pref.modifiers)
-		let hotKeyItem = NSMenuItem(title: "Change Hotkey (\(keyStr))...", action: #selector(changeHotKey), keyEquivalent: "")
-		hotKeyItem.target = self
-		settingsMenu.addItem(hotKeyItem)
-
-		let soundMenu = NSMenu()
-		for name in Self.alertSounds {
-			let item = NSMenuItem(title: name, action: #selector(changeAlertSound(_:)), keyEquivalent: "")
-			item.target = self
-			item.state = name == selectedAlertSound ? .on : .off
-			soundMenu.addItem(item)
-		}
-		let soundItem = NSMenuItem(title: "Alert Sound", action: nil, keyEquivalent: "")
-		soundItem.submenu = soundMenu
-		settingsMenu.addItem(soundItem)
-
-		let loginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
-		loginItem.target = self
-		loginItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
-		settingsMenu.addItem(loginItem)
-
-		let settingsItem = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
-		settingsItem.submenu = settingsMenu
+		let settingsItem = NSMenuItem(title: "Settings...", action: #selector(showSettings), keyEquivalent: "")
+		settingsItem.target = self
 		menu.addItem(settingsItem)
 
 		let quitItem = NSMenuItem(title: "Quit Timerette", action: #selector(quit), keyEquivalent: "")
@@ -334,12 +306,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotifi
 		timerStore.stopRinging(id: id)
 	}
 
-	@objc private func changeAlertSound(_ sender: NSMenuItem) {
-		UserDefaults.standard.set(sender.title, forKey: "alertSound")
-		NSSound(named: sender.title)?.play()
-	}
-
-	@objc private func toggleLaunchAtLogin() {
+	private func toggleLaunchAtLogin() {
 		do {
 			if SMAppService.mainApp.status == .enabled {
 				try SMAppService.mainApp.unregister()
@@ -469,16 +436,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotifi
 		keyNames[keyCode] ?? "Key\(keyCode)"
 	}
 
-	// MARK: Hotkey recorder
-
-	@objc private func changeHotKey() {
-		let recorder = HotKeyRecorderPanel()
-		recorder.onRecord = { [weak self] keyCode, modifiers in
-			self?.updateHotKey(keyCode: keyCode, modifiers: modifiers)
-		}
-		recorder.beginRecording()
-	}
-
 	// MARK: Actions
 
 	@objc private func newTimer() {
@@ -493,8 +450,31 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotifi
 		timerStore.start(.duration(preset.total), label: preset.label)
 	}
 
-	@objc private func showManagePresets() {
-		let panel = ManagePresetsPanel(presetStore: presetStore)
+	@objc private func showSettings() {
+		let panel = SettingsPanel(
+			presetStore: presetStore,
+			alertSounds: Self.alertSounds,
+			selectedSound: selectedAlertSound
+		)
+		panel.hotkeyDisplay = { [weak self] in
+			guard let self else { return "" }
+			let pref = self.loadHotKeyPreference()
+			return self.hotkeyDisplayString(keyCode: pref.keyCode, modifiers: pref.modifiers)
+		}
+		panel.onChangeHotkey = { [weak self, weak panel] in
+			let recorder = HotKeyRecorderPanel()
+			recorder.onRecord = { keyCode, modifiers in
+				self?.updateHotKey(keyCode: keyCode, modifiers: modifiers)
+				panel?.refreshHotkeyDisplay()
+			}
+			recorder.beginRecording()
+		}
+		panel.onSelectSound = { name in
+			UserDefaults.standard.set(name, forKey: "alertSound")
+			NSSound(named: name)?.play()
+		}
+		panel.launchAtLoginIsOn = { SMAppService.mainApp.status == .enabled }
+		panel.onToggleLaunchAtLogin = { [weak self] in self?.toggleLaunchAtLogin() }
 		NSApp.activate(ignoringOtherApps: true)
 		panel.makeKeyAndOrderFront(nil)
 	}

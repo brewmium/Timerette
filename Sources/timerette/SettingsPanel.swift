@@ -1,37 +1,67 @@
 import Cocoa
 
-// MARK: - Manage Presets Panel
+// MARK: - Settings Panel
 
-// A plain editable list: click a cell and type -- edits commit when you
-// leave the field (Return/Tab/click away), no separate save step. Drag rows
-// to reorder. + adds a row, - removes the selected one. Labels are optional.
-class ManagePresetsPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate, NSTextFieldDelegate {
+// One window for everything configurable. The preset list is the main
+// section: click a cell and type -- edits commit when you leave the field
+// (Return/Tab/click away), no separate save step. Drag rows to reorder,
+// + adds a row, - removes the selected one. Labels are optional. Below it:
+// hotkey, alert sound, launch at login.
+class SettingsPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate, NSTextFieldDelegate {
 	private let presetStore: PresetStore
+	private let alertSounds: [String]
 	private var table: NSTableView!
+	private var loginCheck: NSButton!
 	private let statusLabel = NSTextField(labelWithString: "")
+	private let hotkeyValueLabel = NSTextField(labelWithString: "")
 	private let dragType = NSPasteboard.PasteboardType("com.brewmium.timerette.preset-row")
 
-	init(presetStore: PresetStore) {
+	// Wired by AppDelegate -- hotkey registration, sound choice, and login
+	// item state all live there
+	var hotkeyDisplay: (() -> String)?
+	var onChangeHotkey: (() -> Void)?
+	var onSelectSound: ((String) -> Void)?
+	var launchAtLoginIsOn: (() -> Bool)?
+	var onToggleLaunchAtLogin: (() -> Void)?
+
+	init(presetStore: PresetStore, alertSounds: [String], selectedSound: String) {
 		self.presetStore = presetStore
+		self.alertSounds = alertSounds
 
 		super.init(
-			contentRect: NSRect(x: 0, y: 0, width: 420, height: 360),
+			contentRect: NSRect(x: 0, y: 0, width: 420, height: 480),
 			styleMask: [.titled, .closable],
 			backing: .buffered,
 			defer: false
 		)
 
-		title = "Edit Presets"
-		setupUI()
+		title = "Settings"
+		setupUI(selectedSound: selectedSound)
 		table.reloadData()
 		center()
 	}
 
-	private func setupUI() {
-		let content = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 360))
+	func refreshHotkeyDisplay() {
+		hotkeyValueLabel.stringValue = hotkeyDisplay?() ?? ""
+	}
+
+	// Closures are wired after init, so pull live state on first display
+	override func makeKeyAndOrderFront(_ sender: Any?) {
+		refreshHotkeyDisplay()
+		loginCheck.state = (launchAtLoginIsOn?() ?? false) ? .on : .off
+		super.makeKeyAndOrderFront(sender)
+	}
+
+	private func setupUI(selectedSound: String) {
+		let content = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 480))
 		contentView = content
 
-		// Table
+		// Presets section
+		let header = NSTextField(labelWithString: "Presets")
+		header.font = .boldSystemFont(ofSize: 13)
+		header.frame = NSRect(x: 20, y: 444, width: 380, height: 20)
+		content.addSubview(header)
+
 		table = NSTableView()
 		let labelCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("label"))
 		labelCol.title = "Label"
@@ -46,35 +76,82 @@ class ManagePresetsPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate, N
 		table.delegate = self
 		table.registerForDraggedTypes([dragType])
 
-		let scroll = NSScrollView(frame: NSRect(x: 20, y: 88, width: 380, height: 252))
+		let scroll = NSScrollView(frame: NSRect(x: 20, y: 204, width: 380, height: 230))
 		scroll.documentView = table
 		scroll.hasVerticalScroller = true
-		scroll.autoresizingMask = [.width, .height]
 		content.addSubview(scroll)
 
-		// Status line (parse errors)
-		statusLabel.frame = NSRect(x: 20, y: 60, width: 380, height: 20)
-		statusLabel.textColor = .systemRed
-		statusLabel.font = .systemFont(ofSize: 12)
-		content.addSubview(statusLabel)
-
-		// Add / remove
 		let addBtn = NSButton(title: "+", target: self, action: #selector(addPreset))
-		addBtn.frame = NSRect(x: 20, y: 20, width: 32, height: 28)
+		addBtn.frame = NSRect(x: 20, y: 164, width: 32, height: 28)
 		content.addSubview(addBtn)
 
 		let removeBtn = NSButton(title: "-", target: self, action: #selector(removePreset))
-		removeBtn.frame = NSRect(x: 56, y: 20, width: 32, height: 28)
+		removeBtn.frame = NSRect(x: 56, y: 164, width: 32, height: 28)
 		content.addSubview(removeBtn)
 
 		let hint = NSTextField(labelWithString: "Click to edit. Drag to reorder. Labels are optional.")
 		hint.textColor = .secondaryLabelColor
 		hint.font = .systemFont(ofSize: 11)
-		hint.frame = NSRect(x: 100, y: 24, width: 300, height: 17)
+		hint.frame = NSRect(x: 100, y: 168, width: 300, height: 17)
 		content.addSubview(hint)
+
+		// Status line (parse errors)
+		statusLabel.frame = NSRect(x: 20, y: 140, width: 380, height: 18)
+		statusLabel.textColor = .systemRed
+		statusLabel.font = .systemFont(ofSize: 12)
+		content.addSubview(statusLabel)
+
+		let separator = NSBox(frame: NSRect(x: 20, y: 126, width: 380, height: 1))
+		separator.boxType = .separator
+		content.addSubview(separator)
+
+		// Hotkey row
+		let hotkeyLabel = NSTextField(labelWithString: "Hotkey:")
+		hotkeyLabel.frame = NSRect(x: 20, y: 94, width: 70, height: 20)
+		content.addSubview(hotkeyLabel)
+
+		hotkeyValueLabel.font = .systemFont(ofSize: 13)
+		hotkeyValueLabel.frame = NSRect(x: 95, y: 94, width: 110, height: 20)
+		content.addSubview(hotkeyValueLabel)
+
+		let changeBtn = NSButton(title: "Change...", target: self, action: #selector(changeHotkey))
+		changeBtn.frame = NSRect(x: 210, y: 88, width: 110, height: 28)
+		content.addSubview(changeBtn)
+
+		// Alert sound row
+		let soundLabel = NSTextField(labelWithString: "Alert Sound:")
+		soundLabel.frame = NSRect(x: 20, y: 56, width: 90, height: 20)
+		content.addSubview(soundLabel)
+
+		let soundPopup = NSPopUpButton(frame: NSRect(x: 115, y: 52, width: 160, height: 26))
+		soundPopup.addItems(withTitles: alertSounds)
+		soundPopup.selectItem(withTitle: selectedSound)
+		soundPopup.target = self
+		soundPopup.action = #selector(soundChanged(_:))
+		content.addSubview(soundPopup)
+
+		// Launch at login
+		loginCheck = NSButton(checkboxWithTitle: "Launch at Login", target: self, action: #selector(loginToggled))
+		loginCheck.frame = NSRect(x: 18, y: 20, width: 200, height: 20)
+		content.addSubview(loginCheck)
 	}
 
-	// MARK: Actions
+	// MARK: Settings actions
+
+	@objc private func changeHotkey() {
+		onChangeHotkey?()
+	}
+
+	@objc private func soundChanged(_ sender: NSPopUpButton) {
+		guard let name = sender.titleOfSelectedItem else { return }
+		onSelectSound?(name)
+	}
+
+	@objc private func loginToggled() {
+		onToggleLaunchAtLogin?()
+	}
+
+	// MARK: Preset actions
 
 	@objc private func addPreset() {
 		statusLabel.stringValue = ""
