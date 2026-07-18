@@ -84,7 +84,7 @@ class TimerEntryPanel: NSPanel, NSTextFieldDelegate, NSTableViewDataSource, NSTa
 	var onStart: ((TimerInput, String?) -> Void)?
 	var presetsProvider: (() -> [Preset])?
 
-	private let panelWidth: CGFloat = 561
+	private let panelWidth: CGFloat = 450
 	private let fieldHeight: CGFloat = 48
 	private let rowHeight: CGFloat = 40
 	private let maxVisibleRows = 8

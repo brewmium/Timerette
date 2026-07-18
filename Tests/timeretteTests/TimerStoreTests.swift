@@ -71,6 +71,38 @@ final class TimerStoreTests: XCTestCase {
 		XCTAssertEqual(store.timers[0].fireDate.timeIntervalSinceNow, 120, accuracy: 1)
 	}
 
+	func testRestartResetsToFullDuration() {
+		let store = makeStore()
+		store.start(.duration(300))
+		let id = store.timers[0].id
+		store.addMinute(id: id)
+
+		store.restart(id: id)
+		XCTAssertEqual(store.timers[0].state, .running)
+		XCTAssertEqual(store.timers[0].fireDate.timeIntervalSinceNow, 300, accuracy: 1)
+	}
+
+	func testRestartFromPausedRunsAgain() {
+		let store = makeStore()
+		store.start(.duration(300))
+		let id = store.timers[0].id
+		store.pause(id: id)
+
+		store.restart(id: id)
+		XCTAssertEqual(store.timers[0].state, .running)
+		XCTAssertNil(store.timers[0].remainingWhenPaused)
+		XCTAssertEqual(store.timers[0].fireDate.timeIntervalSinceNow, 300, accuracy: 1)
+	}
+
+	func testRestartIgnoresClockAlarm() {
+		let store = makeStore()
+		let target = Date().addingTimeInterval(6000)
+		store.start(.clockTime(target))
+
+		store.restart(id: store.timers[0].id)
+		XCTAssertEqual(store.timers[0].fireDate, target)
+	}
+
 	func testFireTransitionsToRingingThenRemovesAfterTenSeconds() {
 		let store = makeStore()
 		var firedNames: [String] = []

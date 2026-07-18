@@ -37,7 +37,7 @@ once, and its running timers survive a quit or a reboot.
 ## 2. The money path (must be airtight)
 
 ```
-  press Ctrl-Opt-Cmd-C      panel appears, text field focused and empty
+  press Ctrl-Opt-Cmd-T      panel appears, text field focused and empty
   type  2.5                 live row reads "Start a 2m 30s timer" (auto-selected)
   press Return              panel vanishes; menu bar shows a 2m 30s countdown
 ```
@@ -103,7 +103,7 @@ if the badge looks wrong. Decide after seeing it.
 
 - Carbon `RegisterEventHotKey`, identical mechanism to Launchette (the same one
   Alfred/LaunchBar use). Lifted almost verbatim from Launchette's `AppDelegate`.
-- **Default: Ctrl-Opt-Cmd-C** (`keyCode` 0x08 for "C", modifiers
+- **Default: Ctrl-Opt-Cmd-T** (`keyCode` 0x11 for "T", modifiers
   `controlKey | optionKey | cmdKey`).
 - Re-bindable from the menu via the same `HotKeyRecorderPanel` Launchette uses.
   Persisted in `UserDefaults` (`hotKeyKeyCode`, `hotKeyModifiers`).
@@ -221,7 +221,8 @@ Case-insensitive, trimmed, first match wins:
 
 - `start(TimerInput, label:)` (duration -> `fireDate = now + span`; clockTime ->
   `fireDate =` the resolved date), `pause`, `resume`, `cancel`, `addTime`
-  (+1m), `stopRinging`.
+  (+1m), `restart` (back to the full total; duration timers only),
+  `stopRinging`.
 - `soonest` -> the running timer with the nearest `fireDate`; drives the
   menu-bar text.
 - Remaining is always `fireDate - Date()`, **never** a decremented counter -- so
@@ -254,10 +255,10 @@ Rebuilt on open (`menuNeedsUpdate`), running titles live-updated on the tick
 while open. Sections: **running / -- / presets / -- / settings + quit.**
 
 ```
-  Tea -- 2m 28s                     >     submenu: Pause | +1m | Cancel
+  Tea -- 2m 28s                     >     submenu: Pause | +1m | Start Over | Cancel
   Alarm 3:00 PM -- 1h 47m 3s        >     submenu: Pause | +1m | Cancel
   ----------------------------------
-  New Timer...                Ctrl-Opt-Cmd-C
+  New Timer...                Ctrl-Opt-Cmd-T
   Start "Tea" (3m)
   Start "Coffee" (4m)
   Start "Pomodoro" (25m)
@@ -271,6 +272,7 @@ while open. Sections: **running / -- / presets / -- / settings + quit.**
 - **Running section:** one item per active timer. Duration timers read
   `label -- remaining` (unlabeled -> `2m 30s timer -- remaining`); clock alarms
   read `Alarm 3:00 PM -- remaining`. Each has a submenu: Pause/Resume, +1m,
+  Start Over (duration timers only -- an alarm is pinned to wall time),
   Cancel. A **ringing** timer reads `... -- Time's up` with a **Stop**. If none
   running: a disabled "No timers running".
 - **Presets section:** `New Timer...` (opens the panel; shows the hotkey hint),

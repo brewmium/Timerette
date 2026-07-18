@@ -13,9 +13,9 @@ The Apple Clock app can run a timer, but starting one is a whole production -- l
 - **Menu-bar countdown** -- the soonest timer counts down next to the icon in monospaced digits (`2m 30s`, `4d 3h 3m 1s`); an orange badge shows when 2+ run.
 - **Presets** -- Tea 3m, Coffee 4m, Pomodoro 25m, Break 10m out of the box; edit to taste. One click from the menu, or Return on an empty panel.
 - **Inline labels** -- `2.5 tea` starts a 2m 30s timer named "tea".
-- **Pause / +1m / Cancel** per running timer, right in the menu.
+- **Pause / +1m / Start Over / Cancel** per running timer, right in the menu.
 - **Never silent and invisible** -- on fire: a 10-second chime plus a notification with a Stop button. Audio muted or notifications denied? An orange always-on-top chip appears instead.
-- **Configurable hotkey** -- defaults to Ctrl-Opt-Cmd-C. Change it from the menu bar.
+- **Configurable hotkey** -- defaults to Ctrl-Opt-Cmd-T. Change it from the menu bar.
 - **Launch at Login** -- one-click toggle.
 - **Menu bar only** -- no Dock icon, no window, just a countdown where you can see it.
 
@@ -43,10 +43,10 @@ make run
 
 ## Usage
 
-- **Ctrl-Opt-Cmd-C** (or your configured hotkey) to open the panel
+- **Ctrl-Opt-Cmd-T** (or your configured hotkey) to open the panel
 - Type a duration (`2.5`, `90s`, `1h30m`) or a clock time (`3:30pm`, `15:00`) -- the preview updates live -- **Return** starts it
 - **Return** on an empty field starts the first preset; **arrow keys** pick another; **Esc** dismisses
-- Click the menu bar icon to pause, +1m, or cancel running timers, start presets one-click, edit presets, change the hotkey or alert sound
+- Click the menu bar icon to pause, +1m, start over, or cancel running timers, start presets one-click, edit presets, change the hotkey or alert sound
 - `swift test` covers the parser, the countdown format, and persistence
 
 ## Stack

@@ -272,10 +272,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotifi
 		case .paused:
 			add("Resume", #selector(resumeTimer(_:)))
 			add("+1m", #selector(addMinuteToTimer(_:)))
+			if timer.kind == .durationTimer {
+				add("Start Over", #selector(restartTimer(_:)))
+			}
 			add("Cancel", #selector(cancelTimer(_:)))
 		case .running:
 			add("Pause", #selector(pauseTimer(_:)))
 			add("+1m", #selector(addMinuteToTimer(_:)))
+			if timer.kind == .durationTimer {
+				add("Start Over", #selector(restartTimer(_:)))
+			}
 			add("Cancel", #selector(cancelTimer(_:)))
 		}
 		return sub
@@ -311,6 +317,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotifi
 	@objc private func addMinuteToTimer(_ sender: NSMenuItem) {
 		guard let id = sender.representedObject as? UUID else { return }
 		timerStore.addMinute(id: id)
+	}
+
+	@objc private func restartTimer(_ sender: NSMenuItem) {
+		guard let id = sender.representedObject as? UUID else { return }
+		timerStore.restart(id: id)
 	}
 
 	@objc private func cancelTimer(_ sender: NSMenuItem) {
@@ -388,7 +399,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotifi
 			keyCode = UInt32(defaults.integer(forKey: "hotKeyKeyCode"))
 			modifiers = UInt32(defaults.integer(forKey: "hotKeyModifiers"))
 		} else {
-			keyCode = UInt32(kVK_ANSI_C)
+			keyCode = UInt32(kVK_ANSI_T)
 			modifiers = UInt32(controlKey | optionKey | cmdKey)
 		}
 		return (keyCode, modifiers)

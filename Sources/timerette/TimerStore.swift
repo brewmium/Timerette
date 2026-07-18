@@ -89,6 +89,20 @@ class TimerStore {
 		changed()
 	}
 
+	// Start over from the full original duration. Only meaningful for a
+	// duration timer -- a clock alarm is pinned to wall time.
+	func restart(id: UUID) {
+		guard let i = index(of: id), timers[i].kind == .durationTimer else { return }
+		if timers[i].state == .ringing {
+			ringDeadlines[id] = nil
+			onRingEnd?(timers[i])
+		}
+		timers[i].state = .running
+		timers[i].fireDate = Date().addingTimeInterval(timers[i].total)
+		timers[i].remainingWhenPaused = nil
+		changed()
+	}
+
 	func stopRinging(id: UUID) {
 		guard let i = index(of: id), timers[i].state == .ringing else { return }
 		let timer = timers[i]
